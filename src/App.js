@@ -7,6 +7,7 @@ import {hasMode} from './utils/check-mode';
 import setupGhostApi from './utils/api';
 import ContentBox from './components/ContentBox';
 import PopupBox from './components/PopupBox';
+import {disconnectSocket, initiateSocketConnection} from './socketio.service';
 
 function AuthFrame({adminUrl, onLoad}) {
     if (!adminUrl) {
@@ -55,6 +56,16 @@ export default class App extends React.Component {
         // Bind to make sure we have a variable reference (and don't need to create a new binded function in our context value every time the state changes)
         this.dispatchAction = this.dispatchAction.bind(this);
         this.initAdminAuth = this.initAdminAuth.bind(this);
+
+        if (!this.socket) {
+            this.socket = initiateSocketConnection(props.postId);
+        }
+    }
+
+    handleCommentAdded = (postId) => {
+        if (postId === this.props.postId) {
+            this.setState({commentCount: this.state.commentCount + 1});
+        }
     }
 
     /** Initialize comments setup on load, fetch data and setup state*/
@@ -74,6 +85,9 @@ export default class App extends React.Component {
             };
 
             this.setState(state);
+            // to prevent registering the event handler multiple times...
+            this.socket.off('comment.added', this.handleCommentAdded)
+                .on('comment.added', this.handleCommentAdded);
         } catch (e) {
             /* eslint-disable no-console */
             console.error(`[Comments] Failed to initialize:`, e);
@@ -304,6 +318,7 @@ export default class App extends React.Component {
     componentWillUnmount() {
         /**Clear timeouts and event listeners on unmount */
         clearTimeout(this.timeoutId);
+        disconnectSocket();
     }
 
     render() {
